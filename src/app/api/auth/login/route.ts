@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ ok: true });
     response.cookies.set(SESSION_COOKIE, createSessionToken(), sessionCookieOptions());
     return response;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  } catch (error) {
+    console.error("Login route failed", error);
+    return NextResponse.json({ error: "Login gagal di server. Cek Vercel Runtime Logs." }, { status: 500 });
   }
 }
