@@ -1,62 +1,19 @@
 /**
- * 💾 Penyimpanan API Key (Store)
- * ------------------------------
- * Mengelola simpan/baca API key dari file lokal: data/keys.json
+ * 💾 Penyimpanan API Key (Store) — Supabase Edition
+ * ------------------------------------------------
+ * Sebelumnya: baca/tulis file data/keys.json (fs)
+ * Sekarang:   baca/tulis via Supabase REST API (db.ts)
  *
  * 🔒 Keamanan:
- *  - Key disimpan dalam keadaan TER-OBFUSCATE (XOR + base64)
- *    dengan kunci turunan dari nama komputer + user (machine-derived)
- *  - Bukan vault super aman — ini tool personal di localhost.
- *    Tapi mencegah key terbaca polos dari file.
+ *  - Key disimpan TER-enkripsi (AES-256-GCM) di kolom `key`
+ *  - Kunci turunan dari AUTH_SECRET (tetap sama, nggak berubah)
  *
- * Fungsi utama:
- *  - listKeys()    → list key versi MASKED (aman dikirim ke browser)
- *  - getRawKey(id) → ambil key ASLI (hanya dipakai server-side)
- *  - getAllRawKeys → ambil semua key asli (untuk pengecekan massal)
- *  - addKey()      → simpan key baru (otomatis di-obfuscate)
- *  - deleteKey(id) → hapus key
+ * Semua fungsi sekarang ASYNC — route handler harus await.
  */
-import fs from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
-import type { ApiKeyEntry, ApiKeysFile } from "./types";
+import type { ApiKeyEntry } from "./types";
 import { encryptSecret, decryptSecret } from "./encrypt";
-
-/**
- * Persistent storage for API keys.
- *
- * Keys are stored in a local JSON file OUTSIDE the public web root,
- * and are encrypted at rest (AES-256-GCM) using a key derived from
- * AUTH_SECRET. This is a personal tool running on localhost — not a
- * hardened vault — but it prevents casual plaintext leakage.
- *
- * Legacy keys (XOR-obfuscated, no "aes:" prefix) are auto-migrated
- * to AES the first time they are read.
- */
-
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
-const KEYS_FILE = path.join(DATA_DIR, "keys.json");
-
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
-
-function readFile(): ApiKeysFile {
-  try {
-    if (!fs.existsSync(KEYS_FILE)) return { keys: [] };
-    const raw = JSON.parse(fs.readFileSync(KEYS_FILE, "utf8")) as ApiKeysFile;
-    return { keys: raw.keys ?? [] };
-  } catch {
-    return { keys: [] };
-  }
-}
-
-function writeFile(data: ApiKeysFile) {
-  ensureDataDir();
-  fs.writeFileSync(KEYS_FILE, JSON.stringify(data, null, 2), "utf8");
-}
+import { dbListKeys, dbGetKey, dbAddKey, dbDeleteKey } from "./db";
 
 /** Mask a key for display: sk-abc12345...xyz */
 export function maskKey(key: string): string {
@@ -64,59 +21,38 @@ export function maskKey(key: string): string {
   return `${key.slice(0, 6)}••••••••${key.slice(-4)}`;
 }
 
-/**
- * Baca file + migrasi otomatis: key lama (XOR, tanpa prefix "aes:")
- * langsung dienkripsi ulang ke AES-256-GCM saat dibaca.
- */
-function readFileWithMigration(): ApiKeysFile {
-  const file = readFile();
-  let migrated = false;
-  for (const k of file.keys) {
-    if (k.key && !k.key.startsWith("aes:")) {
-      try {
-        k.key = encryptSecret(decryptSecret(k.key));
-        migrated = true;
-      } catch {
-        // key lama gagal dibaca — biarkan apa adanya
-      }
-    }
-  }
-  if (migrated) writeFile(file);
-  return file;
-}
-
 /** Public-safe list of keys (no raw keys, masked only) */
-export function listKeys() {
-  const file = readFileWithMigration();
-  return file.keys.map((k) => ({
+export async function listKeys() {
+  const entries = await dbListKeys();
+  return entries.map((k) => ({
     id: k.id,
     providerId: k.providerId,
     label: k.label,
     baseUrl: k.baseUrl,
-    maskedKey: maskKey(k.key.startsWith("aes:") ? decryptSecret(k.key) : k.key),
+    maskedKey: maskKey(
+      k.key.startsWith("aes:") ? decryptSecret(k.key) : k.key
+    ),
     createdAt: k.createdAt,
   }));
 }
 
-export function getRawKey(id: string): ApiKeyEntry | undefined {
-  const file = readFileWithMigration();
-  const entry = file.keys.find((k) => k.id === id);
+export async function getRawKey(id: string): Promise<ApiKeyEntry | undefined> {
+  const entry = await dbGetKey(id);
   if (!entry) return undefined;
   return { ...entry, key: decryptSecret(entry.key) };
 }
 
-export function getAllRawKeys(): ApiKeyEntry[] {
-  const file = readFileWithMigration();
-  return file.keys.map((k) => ({ ...k, key: decryptSecret(k.key) }));
+export async function getAllRawKeys(): Promise<ApiKeyEntry[]> {
+  const entries = await dbListKeys();
+  return entries.map((k) => ({ ...k, key: decryptSecret(k.key) }));
 }
 
-export function addKey(input: {
+export async function addKey(input: {
   providerId: string;
   label?: string;
   key: string;
   baseUrl?: string;
-}): ApiKeyEntry {
-  const file = readFile();
+}): Promise<ApiKeyEntry> {
   const entry: ApiKeyEntry = {
     id: crypto.randomUUID(),
     providerId: input.providerId as ApiKeyEntry["providerId"],
@@ -125,15 +61,11 @@ export function addKey(input: {
     ...(input.baseUrl?.trim() ? { baseUrl: input.baseUrl.trim() } : {}),
     createdAt: new Date().toISOString(),
   };
-  file.keys.push(entry);
-  writeFile(file);
+  await dbAddKey(entry);
   return entry;
 }
 
-export function deleteKey(id: string): boolean {
-  const file = readFile();
-  const before = file.keys.length;
-  file.keys = file.keys.filter((k) => k.id !== id);
-  writeFile(file);
-  return file.keys.length < before;
+export async function deleteKey(id: string): Promise<boolean> {
+  await dbDeleteKey(id);
+  return true;
 }

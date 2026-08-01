@@ -38,15 +38,15 @@ export async function POST(request: NextRequest) {
     if (password.length < 4) {
       return NextResponse.json({ error: "Password minimal 4 karakter" }, { status: 400 });
     }
-    if (!verifyResetToken(token)) {
+    if (!(await verifyResetToken(token))) {
       return NextResponse.json(
         { error: "Token tidak valid atau sudah kedaluwarsa. Jalankan ulang npm run reset-password." },
         { status: 401 }
       );
     }
 
-    setPasswordHash(hashPassword(password));
-    consumeResetToken();
+    await setPasswordHash(hashPassword(password));
+    await consumeResetToken();
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });

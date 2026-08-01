@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Password wajib diisi" }, { status: 400 });
     }
 
-    const hash = getPasswordHash();
+    const hash = await getPasswordHash();
     if (!verifyPassword(password, hash)) {
       return NextResponse.json({ error: "Password salah" }, { status: 401 });
     }

@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
   const refresh = request.nextUrl.searchParams.get("refresh") === "1";
-  const keys = getAllRawKeys();
+  const keys = await getAllRawKeys();
 
   if (keys.length === 0) {
     return NextResponse.json({ results: [], checkedAt: new Date().toISOString() });

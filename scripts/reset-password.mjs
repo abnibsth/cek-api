@@ -1,6 +1,6 @@
 /**
- * 🔄 Script Reset Password (dari terminal)
- * ----------------------------------------
+ * 🔄 Script Reset Password (dari terminal) — Supabase Edition
+ * ------------------------------------------------------------
  * Cara pakai:
  *   npm run reset-password
  *
@@ -9,37 +9,50 @@
  *  2. Print link reset: {APP_URL}/reset?token=xxx
  *  3. Buka link itu di browser → isi password baru
  *
- * Token disimpan di data/auth.json — langsung bisa dipakai
- * oleh halaman /reset tanpa restart server.
+ * Token disimpan di Supabase table "auth" (row id=1) —
+ * langsung bisa dipakai oleh halaman /reset tanpa restart server.
  *
  * Env:
- *  - APP_URL : URL app (default http://localhost:3000)
+ *  - APP_URL            : URL app (default http://localhost:3000)
+ *  - SUPABASE_URL       : https://xxxx.supabase.co
+ *  - SUPABASE_SERVICE_KEY : service_role key
  */
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 
-const AUTH_FILE = path.join(
-  process.env.DATA_DIR || path.join(process.cwd(), "data"),
-  "auth.json"
-);
 const TTL_MS = 10 * 60 * 1000;
-
 const appUrl = process.env.APP_URL || "http://localhost:3000";
+const SB_URL = process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SB_URL || !SB_KEY) {
+  console.error("❌ SUPABASE_URL & SUPABASE_SERVICE_KEY belum diatur di .env");
+  process.exit(1);
+}
 
 const token = crypto.randomBytes(32).toString("hex");
+const expiresAt = Date.now() + TTL_MS;
 
-fs.mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
-const existing = (() => {
-  try {
-    return JSON.parse(fs.readFileSync(AUTH_FILE, "utf8"));
-  } catch {
-    return {};
-  }
-})();
+// Update row id=1 di table auth via Supabase REST API
+const res = await fetch(`${SB_URL}/rest/v1/auth?id=eq.1`, {
+  method: "PATCH",
+  headers: {
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`,
+    "Content-Type": "application/json",
+    Prefer: "return=minimal",
+  },
+  body: JSON.stringify({
+    reset_token: token,
+    reset_expires: expiresAt,
+  }),
+});
 
-existing.resetToken = { token, expiresAt: Date.now() + TTL_MS };
-fs.writeFileSync(AUTH_FILE, JSON.stringify(existing, null, 2), "utf8");
+if (!res.ok) {
+  const body = await res.text().catch(() => "");
+  console.error(`❌ Gagal simpan token ke Supabase (${res.status}): ${body.slice(0, 200)}`);
+  console.error("   Pastikan table 'auth' sudah dibuat dengan row id=1.");
+  process.exit(1);
+}
 
 console.log("");
 console.log("================================================");

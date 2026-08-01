@@ -39,18 +39,20 @@ async function guard(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const denied = await guard(request);
   if (denied) return denied;
-  const keys = listKeys();
-  const items = keys.map((k) => {
-    const raw = getRawKey(k.id);
-    const provider = raw ? getProvider(raw.providerId) : undefined;
-    const cached = raw ? getCached(raw.id) : null;
-    return {
-      ...k,
-      providerName: provider?.name ?? k.providerId,
-      baseUrl: raw.baseUrl?.trim() || provider?.baseUrl || "",
-      cachedResult: cached,
-    };
-  });
+  const keys = await listKeys();
+  const items = await Promise.all(
+    keys.map(async (k) => {
+      const raw = await getRawKey(k.id);
+      const provider = raw ? getProvider(raw.providerId) : undefined;
+      const cached = raw ? getCached(raw.id) : null;
+      return {
+        ...k,
+        providerName: provider?.name ?? k.providerId,
+        baseUrl: raw?.baseUrl?.trim() || provider?.baseUrl || "",
+        cachedResult: cached,
+      };
+    })
+  );
   return NextResponse.json({ keys: items });
 }
 
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const entry = addKey({ providerId, label, key, baseUrl });
+    const entry = await addKey({ providerId, label, key, baseUrl });
     return NextResponse.json({ ok: true, id: entry.id }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
@@ -100,6 +102,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "id query param required" }, { status: 400 });
   }
   const { deleteKey } = await import("@/lib/store");
-  const ok = deleteKey(id);
+  const ok = await deleteKey(id);
   return NextResponse.json({ ok });
 }

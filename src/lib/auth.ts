@@ -1,44 +1,36 @@
 /**
- * 🔐 Autentikasi (Auth)
- * ---------------------
- * Sistem login password tunggal — cocok untuk tool personal
- * yang diakses dari mana saja (deploy ke VPS).
+ * 🔐 Autentikasi (Auth) — Supabase Edition
+ * ------------------------------------------
+ * Sebelumnya: password hash & reset token di data/auth.json (fs)
+ * Sekarang:   di Supabase table "auth" (single row, id=1)
  *
- * Desain:
+ * Yang TIDAK berubah:
  *  - Password utama dari env var AUTH_PASSWORD
- *  - Reset password → token sekali pakai (10 menit) → hash baru
- *    disimpan di data/auth.json (override env var)
- *  - Password disimpan sebagai HASH (scrypt) — bukan plaintext
- *  - Session = token HMAC-SHA256 berisi payload + signature
- *    (tidak bisa dipalsukan tanpa AUTH_SECRET)
- *  - Cookie httpOnly + sameSite=lax + secure (jika HTTPS)
+ *  - Hash password: scrypt (sinkron, tetap)
+ *  - Session token: HMAC-SHA256 (sinkron, tetap)
+ *  - Cookie httpOnly + sameSite=lax + secure (HTTPS)
+ *
+ * Yang berubah jadi async:
+ *  - getPasswordHash() → baca dari Supabase
+ *  - setPasswordHash() → tulis ke Supabase
+ *  - createResetToken() → tulis ke Supabase
+ *  - verifyResetToken() → baca dari Supabase
+ *  - consumeResetToken() → update Supabase
  *
  * Env vars:
- *  - AUTH_PASSWORD : password login awal (WAJIB diisi sebelum deploy)
- *  - AUTH_SECRET   : kunci rahasia session (WAJIB diisi, random)
- *
- * Reset password (jika lupa):
- *  npm run reset-password → print link sekali pakai
+ *  - AUTH_PASSWORD : password login awal (WAJIB)
+ *  - AUTH_SECRET   : kunci rahasia session (WAJIB, random)
+ *  - SUPABASE_URL  : URL project Supabase
+ *  - SUPABASE_SERVICE_KEY : service_role key
  */
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
+import { dbGetAuth, dbUpsertAuth } from "./db";
 
 const SESSION_COOKIE = "cekapi_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 hari
 
 /** Waktu validasi token reset password (10 menit) */
 export const RESET_TOKEN_TTL_MS = 10 * 60 * 1000;
-
-const AUTH_FILE = path.join(
-  process.env.DATA_DIR || path.join(process.cwd(), "data"),
-  "auth.json"
-);
-
-interface AuthFile {
-  passwordHash?: string;
-  resetToken?: { token: string; expiresAt: number };
-}
 
 /* ── Env config ────────────────────────────────────────────── */
 
@@ -62,23 +54,7 @@ function getSecret(): string {
   return secret;
 }
 
-/* ── File penyimpanan hash (data/auth.json) ───────────────── */
-
-function readAuthFile(): AuthFile {
-  try {
-    if (!fs.existsSync(AUTH_FILE)) return {};
-    return JSON.parse(fs.readFileSync(AUTH_FILE, "utf8")) as AuthFile;
-  } catch {
-    return {};
-  }
-}
-
-function writeAuthFile(data: AuthFile) {
-  fs.mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
-  fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), "utf8");
-}
-
-/* ── Hashing password (scrypt) ─────────────────────────────── */
+/* ── Hashing password (scrypt) — tetap sinkron ─────────────── */
 
 export function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -97,62 +73,66 @@ export function verifyPassword(password: string, stored: string): boolean {
   }
 }
 
-/**
- * Hash password aktif: pakai hash dari data/auth.json (jika ada hasil reset),
- * selain itu derive stabil dari AUTH_PASSWORD. Di-cache di memory.
- */
+/* ── Password hash storage (Supabase) — async ──────────────── */
+
 let cachedHash: string | null = null;
 
-export function getPasswordHash(): string {
+export async function getPasswordHash(): Promise<string> {
   if (cachedHash) return cachedHash;
-  const file = readAuthFile();
-  if (file.passwordHash) {
-    cachedHash = file.passwordHash;
+  const row = await dbGetAuth();
+  if (row.password_hash) {
+    cachedHash = row.password_hash;
     return cachedHash;
   }
+  // Belum ada hash di DB → derive dari AUTH_PASSWORD, simpan
   cachedHash = hashPassword(getPassword());
+  await dbUpsertAuth({ id: 1, password_hash: cachedHash });
   return cachedHash;
 }
 
 /** Simpan hash baru (dipanggil saat reset password) */
-export function setPasswordHash(hash: string) {
+export async function setPasswordHash(hash: string): Promise<void> {
   cachedHash = hash;
-  const file = readAuthFile();
-  file.passwordHash = hash;
-  file.resetToken = undefined;
-  writeAuthFile(file);
+  await dbUpsertAuth({
+    password_hash: hash,
+    reset_token: null,
+    reset_expires: null,
+  });
 }
 
-/* ── Token reset sekali pakai ──────────────────────────────── */
+/* ── Token reset sekali pakai (Supabase) — async ────────────── */
 
-export function createResetToken(): string {
+export async function createResetToken(): Promise<string> {
   const token = crypto.randomBytes(32).toString("hex");
-  const file = readAuthFile();
-  file.resetToken = { token, expiresAt: Date.now() + RESET_TOKEN_TTL_MS };
-  writeAuthFile(file);
+  await dbUpsertAuth({
+    reset_token: token,
+    reset_expires: Date.now() + RESET_TOKEN_TTL_MS,
+  });
   return token;
 }
 
-export function verifyResetToken(token: string | undefined): boolean {
+export async function verifyResetToken(token: string | undefined): Promise<boolean> {
   if (!token) return false;
-  const file = readAuthFile();
-  if (!file.resetToken) return false;
-  return (
-    crypto.timingSafeEqual(
-      Buffer.from(file.resetToken.token),
-      Buffer.from(token)
-    ) && file.resetToken.expiresAt > Date.now()
-  );
+  const row = await dbGetAuth();
+  if (!row.reset_token || !row.reset_expires) return false;
+  try {
+    return (
+      crypto.timingSafeEqual(
+        Buffer.from(row.reset_token),
+        Buffer.from(token)
+      ) && row.reset_expires > Date.now()
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Hapus token setelah berhasil dipakai */
-export function consumeResetToken() {
-  const file = readAuthFile();
-  file.resetToken = undefined;
-  writeAuthFile(file);
+export async function consumeResetToken(): Promise<void> {
+  await dbUpsertAuth({ reset_token: null, reset_expires: null });
 }
 
-/* ── Session token (HMAC) ──────────────────────────────────── */
+/* ── Session token (HMAC) — tetap sinkron ──────────────────── */
 
 export function createSessionToken(): string {
   const payload = Buffer.from(

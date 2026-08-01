@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const entry = getRawKey(keyId);
+    const entry = await getRawKey(keyId);
     if (!entry) {
       return NextResponse.json({ error: "Key not found" }, { status: 404 });
     }

@@ -1,10 +1,2 @@
-# Docker ignore — file yang nggak usah ikut ke container
-node_modules
-.next
-data
-.env
-.env.local
-.git
-npm-debug.log*
-*.zip
-*.tsbuildinfo
+# This file is no longer needed — app now deploys to Vercel (serverless) + Supabase (storage).
+# Kept for reference only. Safe to delete.
