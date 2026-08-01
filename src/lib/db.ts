@@ -118,8 +118,8 @@ export async function dbGetAuth(): Promise<AuthRow> {
 }
 
 export async function dbUpsertAuth(patch: Partial<AuthRow>): Promise<void> {
-  await req(`/auth`, {
+  await req(`/auth?id=eq.1`, {
     method: "PATCH",
-    body: JSON.stringify(patch),
+    body: JSON.stringify({ ...patch, id: undefined }),
   }, "empty");
 }
