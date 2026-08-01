@@ -62,7 +62,7 @@ export interface KeyRow {
 function rowToEntry(r: KeyRow): ApiKeyEntry {
   return {
     id: r.id,
-    providerId: r.provider_id,
+    providerId: r.provider_id as ApiKeyEntry["providerId"],
     label: r.label,
     key: r.key,
     ...(r.base_url ? { baseUrl: r.base_url } : {}),
