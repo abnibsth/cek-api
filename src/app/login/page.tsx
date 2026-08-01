@@ -48,6 +48,12 @@ export default function LoginPage() {
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/image.png"
+            alt="Cek API"
+            className="mx-auto mb-4 h-14 w-14 rounded-lg object-contain"
+          />
           <h1 className="text-4xl font-light tracking-tight text-[var(--text-strong)]">
             Cek <span className="text-[var(--primary)]">API</span>
           </h1>

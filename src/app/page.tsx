@@ -157,13 +157,21 @@ export default function Dashboard() {
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-12 px-4 py-8 pt-safe sm:gap-16 sm:px-6 sm:py-12">
       {/* Header */}
       <header className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-3xl font-light tracking-tight text-[var(--text-strong)] sm:text-5xl">
-            Cek <span className="text-[var(--primary)]">API</span>
-          </h1>
-          <p className="mt-2 text-sm text-[var(--text-body)] sm:text-base">
-            Pantau validitas & sisa kuota semua API key AI-mu dalam satu layar
-          </p>
+        <div className="flex items-end gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/image.png"
+            alt="Cek API"
+            className="h-12 w-12 rounded-lg object-contain sm:h-14 sm:w-14"
+          />
+          <div className="min-w-0">
+            <h1 className="text-3xl font-light tracking-tight text-[var(--text-strong)] sm:text-5xl">
+              Cek <span className="text-[var(--primary)]">API</span>
+            </h1>
+            <p className="mt-2 text-sm text-[var(--text-body)] sm:text-base">
+              Pantau validitas & sisa kuota semua API key AI-mu dalam satu layar
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <ThemeToggle />

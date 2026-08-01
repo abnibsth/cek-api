@@ -30,6 +30,9 @@ export const metadata: Metadata = {
   title: "Cek API — Monitor API Key",
   description:
     "Dashboard personal untuk memeriksa validitas API key dan sisa kuota berbagai provider AI.",
+  icons: {
+    icon: "/image.png",
+  },
 };
 
 export const viewport = {
