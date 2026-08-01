@@ -1,26 +1,205 @@
+/**
+ * 🎨 Styling Global — PlayStation Design System (Dark/Light)
+ * ---------------------------------------------------------
+ * 2 tema via CSS design tokens + class `dark` di <html>.
+ * Light = default. Dark = PS dark canvas (#000, #121314, #181818).
+ *
+ * Aturan anti-AI-slop:
+ *  - Flat-on-canvas: tanpa glow, tanpa gradient chrome, tanpa shadow resting
+ *  - PlayStation Blue (#0070d1) hanya untuk primary CTA & link
+ *  - Radius: 4px (input) / 8px (card) / pill (tombol)
+ *  - Tipografi Roboto weight 300 (light) untuk display
+ */
 @import "tailwindcss";
 
+/* Dark mode = class-based (di-toggle oleh ThemeToggle) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============ TOKENS — LIGHT (default) ============ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surface */
+  --bg: #ffffff;
+  --surface: #f5f7fa;
+  --surface-soft: #f3f3f3;
+  --card: #ffffff;
+  --hairline: #e8e8e8;
+  --input-bg: #ffffff;
+  --border-input: #cccccc;
+
+  /* Text */
+  --text-strong: #000000;
+  --text: #121314;
+  --text-body: rgba(0, 0, 0, 0.6);
+  --text-mute: #6b6b6b;
+  --text-faint: #999999;
+  --text-disabled: #cccccc;
+
+  /* Brand */
+  --primary: #0070d1;
+  --primary-pressed: #0064b7;
+  --primary-active: #004d8d;
+  --on-primary: #ffffff;
+
+  /* Semantic */
+  --success: #12805c;
+  --success-soft: rgba(18, 128, 92, 0.08);
+  --success-border: rgba(18, 128, 92, 0.35);
+  --warning: #c81b3a;
+  --warning-soft: rgba(200, 27, 58, 0.08);
+  --warning-border: rgba(200, 27, 58, 0.35);
+  --error: #b45309;
+  --error-soft: rgba(180, 83, 9, 0.08);
+  --error-border: rgba(180, 83, 9, 0.35);
+
+  /* Ring / dot */
+  --ring: rgba(0, 0, 0, 0.1);
+
+  --background: var(--bg);
+  --foreground: var(--text);
+}
+
+/* ============ TOKENS — DARK ============ */
+.dark {
+  /* Surface (PS dark canvas) */
+  --bg: #000000;
+  --surface: #121314;
+  --surface-soft: #1f2024;
+  --card: #181818;
+  --hairline: rgba(229, 229, 229, 0.2);
+  --input-bg: #181818;
+  --border-input: rgba(229, 229, 229, 0.25);
+
+  /* Text (PS on-dark) */
+  --text-strong: #ffffff;
+  --text: rgba(255, 255, 255, 0.85);
+  --text-body: rgba(255, 255, 255, 0.7);
+  --text-mute: #cccccc;
+  --text-faint: rgba(229, 229, 229, 0.55);
+  --text-disabled: rgba(229, 229, 229, 0.35);
+
+  /* Brand — pressed/active lebih terang di dark */
+  --primary: #0070d1;
+  --primary-pressed: #1a85e6;
+  --primary-active: #2f96f5;
+  --on-primary: #ffffff;
+
+  /* Semantic — versi lebih terang untuk kontras di dark */
+  --success: #33c184;
+  --success-soft: rgba(51, 193, 132, 0.12);
+  --success-border: rgba(51, 193, 132, 0.4);
+  --warning: #ff5c7a;
+  --warning-soft: rgba(255, 92, 122, 0.12);
+  --warning-border: rgba(255, 92, 122, 0.4);
+  --error: #f0a040;
+  --error-soft: rgba(240, 160, 64, 0.12);
+  --error-border: rgba(240, 160, 64, 0.4);
+
+  --ring: rgba(255, 255, 255, 0.18);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-roboto), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-roboto-mono), ui-monospace, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-roboto), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* 📱 Mobile & touch optimizations */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Safe area untuk HP ber-notch (iPhone dll) */
+@supports (padding: max(0px)) {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .px-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+@media (pointer: coarse) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+}
+
+/* Form controls */
+select option {
+  background-color: #ffffff;
+  color: #121314;
+}
+.dark select option {
+  background-color: #181818;
+  color: #ffffff;
+}
+
+/* Focus ring: PlayStation style = border weight, no halo */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  border-width: 2px;
+}
+
+/* Smooth entrance animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-in {
+    animation: fadeInUp 0.4s ease-out both;
+  }
 }

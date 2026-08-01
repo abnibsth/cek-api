@@ -1,0 +1,10 @@
+# Docker ignore — file yang nggak usah ikut ke container
+node_modules
+.next
+data
+.env
+.env.local
+.git
+npm-debug.log*
+*.zip
+*.tsbuildinfo
