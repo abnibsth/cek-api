@@ -237,7 +237,12 @@ export default function Dashboard() {
       )}
 
       {/* Add form */}
-      <AddKeyForm onAdded={() => runCheck(true)} />
+      <AddKeyForm
+        onAdded={async () => {
+          await loadKeys();
+          await runCheck(true);
+        }}
+      />
 
       {/* Key cards */}
       {loading ? (
